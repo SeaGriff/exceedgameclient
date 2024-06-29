@@ -1,5 +1,5 @@
 # This is the main game engine.
-# 
+#
 # Actions from either player are sent to this script via game_wrapper.gd.
 # The wrapper protects the engine from having to care whether player inputs
 # are from the local player, from a remote player, or were generated
@@ -161,11 +161,11 @@ func printlog(text):
 func is_number(test_value):
 	return test_value is int or test_value is float
 
-func create_event(event_type : Enums.EventType, 
-		event_player : Enums.PlayerId, 
-		num : int, reason: String = "", 
-		extra_info = null, 
-		extra_info2 = null, 
+func create_event(event_type : Enums.EventType,
+		event_player : Enums.PlayerId,
+		num : int, reason: String = "",
+		extra_info = null,
+		extra_info2 = null,
 		extra_info3 = null):
 	var card_name = card_db.get_card_name(num)
 	var playerstr = "Player"
@@ -3222,11 +3222,11 @@ func get_random_int() -> int:
 func get_random_int_range(from : int, to : int) -> int:
 	return random_number_generator.randi_range(from, to)
 
-func initialize_game(player_deck, 
-		opponent_deck, 
-		player_name : String, 
-		opponent_name : String, 
-		first_player : Enums.PlayerId, 
+func initialize_game(player_deck,
+		opponent_deck,
+		player_name : String,
+		opponent_name : String,
+		first_player : Enums.PlayerId,
 		seed_value : int):
 	random_number_generator.seed = seed_value
 	card_db = CardDatabase.new()
@@ -3235,17 +3235,17 @@ func initialize_game(player_deck,
 	if first_player == Enums.PlayerId.PlayerId_Opponent:
 		player_card_id_start = 200
 		opponent_card_id_start = 100
-	player = Player.new(Enums.PlayerId.PlayerId_Player, 
-		player_name, 
-		self, 
-		card_db, 
-		player_deck, 
+	player = Player.new(Enums.PlayerId.PlayerId_Player,
+		player_name,
+		self,
+		card_db,
+		player_deck,
 		player_card_id_start)
-	opponent = Player.new(Enums.PlayerId.PlayerId_Opponent, 
-		opponent_name, 
-		self, 
-		card_db, 
-		opponent_deck, 
+	opponent = Player.new(Enums.PlayerId.PlayerId_Opponent,
+		opponent_name,
+		self,
+		card_db,
+		opponent_deck,
 		opponent_card_id_start)
 
 	active_turn_player = first_player
@@ -3256,7 +3256,7 @@ func initialize_game(player_deck,
 	starting_player.starting_location = 3
 	if starting_player.buddy_starting_offset != BuddyStartsOutOfArena:
 		var buddy_space = 3 + starting_player.buddy_starting_offset
-		event_queue += starting_player.place_buddy(buddy_space, 
+		event_queue += starting_player.place_buddy(buddy_space,
 			starting_player.buddy_starting_id, true)
 	second_player.arena_location = 7
 	second_player.starting_location = 7
@@ -3271,8 +3271,8 @@ func draw_starting_hands_and_begin():
 	var starting_player = _get_player(active_turn_player)
 	var second_player = _get_player(next_turn_player)
 	_append_log_full(Enums.LogType.LogType_Default, null,
-		"Game Start - %s as %s (1st) vs %s as %s (2nd)" % [starting_player.name, 
-			starting_player.deck_def['display_name'], second_player.name, 
+		"Game Start - %s as %s (1st) vs %s as %s (2nd)" % [starting_player.name,
+			starting_player.deck_def['display_name'], second_player.name,
 			second_player.deck_def['display_name']])
 	events += starting_player.draw(StartingHandFirstPlayer + starting_player.starting_hand_size_bonus)
 	events += second_player.draw(StartingHandSecondPlayer + second_player.starting_hand_size_bonus)

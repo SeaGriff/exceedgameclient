@@ -123,7 +123,7 @@ func set_player_character(value: String):
 func set_combat_log_setting(setting : String, value):
 	CombatLogSettings[setting] = value
 	save_persistent_settings()
-	
+
 func set_randomize_first_player_vs_ai(value : bool):
 	RandomizeFirstVsAI = value
 	save_persistent_settings()

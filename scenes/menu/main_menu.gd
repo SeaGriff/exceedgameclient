@@ -21,9 +21,15 @@ const ModalDialog = preload("res://scenes/game/modal_dialog.gd")
 @onready var room_select : LineEdit = $MenuList/JoinBox/RoomNameBox
 @onready var join_room_button = $MenuList/JoinBox/JoinButton
 @onready var join_box = $MenuList/JoinBox
-@onready var matchmake_button = $MenuList/MatchmakeButton
+
+@onready var matchmake_timed_button = $MenuList/MatchmakeBox/MatchmakeTimedButton
+@onready var matchmake_untimed_button = $MenuList/MatchmakeBox/MatchmakeUntimedButton
+@onready var matchmake_speed_button = $MenuList/MatchmakeBox/MatchmakeSpeedButton
 @onready var settings_button = $SettingsButton
 @onready var settings_window = $PreferencesWindow
+@onready var cancel_button = $MenuList/CancelButton
+@onready var reconnect_button = $ReconnectToServerButton
+@onready var server_status_label = $ServerStatusLabel
 
 @onready var char_select = $CharSelect
 @onready var change_player_character_button : Button = $PlayerChooser/ChangePlayerCharacterButton
@@ -43,8 +49,9 @@ const ModalDialog = preload("res://scenes/game/modal_dialog.gd")
 @onready var label_font_small = 18
 @onready var label_length_threshold = 15
 
-# Start as true to not play sounds right when you get to the main menu.
+# Starts as true so as not to play sounds right when you get to the main menu
 @onready var was_match_available : bool = true
+
 @onready var just_clicked_matchmake : bool = false
 
 # Called when the node enters the scene tree for the first time.
@@ -56,15 +63,15 @@ func _ready():
 	NetworkManager.connect("observe_started", _on_observe_game_started)
 	NetworkManager.connect("players_update", _on_players_update)
 	NetworkManager.connect("room_join_failed", _on_join_failed)
-	$MenuList/CancelButton.visible = false
-	$ReconnectToServerButton.visible = false
-	_on_players_update(NetworkManager.get_player_list(), NetworkManager.get_match_list(), NetworkManager.get_match_available())
+	cancel_button.visible = false
+	reconnect_button.visible = false
+	_on_players_update(NetworkManager.get_player_list(), NetworkManager.get_match_list(), NetworkManager.get_matches_available())
 	selecting_player = false
 	just_clicked_matchmake = false
 	_on_char_select_select_character(opponent_selected_character)
 	modal_dialog.visible = false
 	modal_list.visible = false
-	
+
 	# Initialize settings window
 	settings_window.visible = false
 	settings_window.bgm_check_toggled.connect(_on_bgm_check_toggled)
@@ -108,26 +115,25 @@ func _on_start_button_pressed():
 	var opponent_deck = CardDefinitions.get_deck_from_str_id(opponent_selected_character)
 	var player_name = get_player_name()
 	var opponent_name = "CPU"
-	start_game.emit(get_vs_info(player_name, 
-		player_deck, 
-		player_random_tag, 
-		opponent_name, 
-		opponent_deck, 
-		opponent_random_tag, 
+	start_game.emit(get_vs_info(player_name,
+		player_deck,
+		player_random_tag,
+		opponent_name,
+		opponent_deck,
+		opponent_random_tag,
 		GlobalSettings.RandomizeFirstVsAI))
-
-func _on_quit_button_pressed():
-	get_tree().quit()
 
 func _on_connected(player_name):
 	join_room_button.disabled = false
-	matchmake_button.disabled = false
+	matchmake_timed_button.disabled = false
+	matchmake_untimed_button.disabled = false
+	matchmake_speed_button.disabled = false
 	player_list_button.disabled = false
 	match_list_button.disabled = false
 	player_name_box.editable = true
 	player_name_box.text = player_name
-	$ReconnectToServerButton.visible = false
-	$ServerStatusLabel.text = "Connected to server."
+	reconnect_button.visible = false
+	server_status_label.text = "Connected to server."
 	if GlobalSettings.DefaultPlayerName:
 		player_name_box.text = GlobalSettings.DefaultPlayerName
 		NetworkManager.set_player_name(player_name_box.text)
@@ -137,16 +143,18 @@ func _on_connected(player_name):
 func _on_disconnected():
 	update_buttons(false)
 	join_room_button.disabled = true
-	matchmake_button.disabled = true
+	matchmake_timed_button.disabled = true
+	matchmake_untimed_button.disabled = false
+	matchmake_speed_button.disabled = false
 	player_list_button.disabled = true
 	match_list_button.disabled = true
-	$ReconnectToServerButton.visible = true
-	$ReconnectToServerButton.disabled = false
-	$ServerStatusLabel.text = "Disconnected from server."
+	reconnect_button.visible = true
+	reconnect_button.disabled = false
+	server_status_label.text = "Disconnected from server."
 	just_clicked_matchmake = false
 	_on_players_update([], [], false)
 
-func get_vs_info(player_name, player_deck, player_random_tag, opponent_name, 
+func get_vs_info(player_name, player_deck, player_random_tag, opponent_name,
 		opponent_deck, opponent_random_tag, randomize_first_vs_ai = false):
 	return {
 		'player_name': player_name,
@@ -196,7 +204,7 @@ func _on_observe_game_started(data):
 
 	var player_deck_object = CardDefinitions.get_deck_from_str_id(player_deck_no_random)
 	var opponent_deck_object = CardDefinitions.get_deck_from_str_id(opponent_deck_no_random)
-	start_remote_game.emit(get_vs_info(player_name, player_deck_object, 
+	start_remote_game.emit(get_vs_info(player_name, player_deck_object,
 		player_random_tag, opponent_name, opponent_deck_object, opponent_random_tag), start_data)
 
 # Handles a signal from _handle_game_start in network manager
@@ -231,10 +239,12 @@ func _on_remote_game_started(data):
 
 	var player_deck_object = CardDefinitions.get_deck_from_str_id(player_deck_no_random)
 	var opponent_deck_object = CardDefinitions.get_deck_from_str_id(opponent_deck_no_random)
-	start_remote_game.emit(get_vs_info(player_name, player_deck_object, 
+	start_remote_game.emit(get_vs_info(player_name, player_deck_object,
 		player_random_tag, opponent_name, opponent_deck_object, opponent_random_tag), data)
 
-func _on_players_update(players, matches, match_available : bool):
+func _on_players_update(players,
+		matches,
+		match_types_available):
 	player_list.clear()
 	for player in players:
 		player_list.add_item(player['player_name'] + " - " + player['room_name'])
@@ -244,15 +254,33 @@ func _on_players_update(players, matches, match_available : bool):
 	$PlayerListContainer/PlayerListHBox/PlayerCount.text = str(player_count)
 	$RoomListContainer/RoomListHBox/MatchCount.text = str(match_count)
 
-	if match_available:
-		matchmake_button.text = "Join Match Now"
+	if match_types_available["untimed_match_available"]:
+		matchmake_untimed_button.text = "Join Untimed Match Now"
 		if not was_match_available and not just_clicked_matchmake:
 			if visible:
 				$MatchAvailableAudio.play()
 	else:
-		matchmake_button.text = "Start Matchmaking"
+		matchmake_untimed_button.text = "Start Untimed Game Matchmaking"
 
-	was_match_available = match_available
+	if match_types_available["timed_match_available"]:
+		matchmake_timed_button.text = "Join Timed Match Now"
+		if not was_match_available and not just_clicked_matchmake:
+			if visible:
+				$MatchAvailableAudio.play()
+	else:
+		matchmake_timed_button.text = "Start Timed Game Matchmaking"
+
+	if match_types_available["speed_match_available"]:
+		matchmake_speed_button.text = "Join Speed Match Now"
+		if not was_match_available and not just_clicked_matchmake:
+			if visible:
+				$MatchAvailableAudio.play()
+	else:
+		matchmake_speed_button.text = "Start Speed Game Matchmaking"
+
+	was_match_available = match_types_available["untimed_match_available"] \
+		or match_types_available["timed_match_available"] \
+		or match_types_available["speed_match_available"]
 
 func _on_join_failed(error_message : String):
 	modal_dialog.set_text_fields(error_message, "OK", "")
@@ -269,10 +297,10 @@ func _on_join_button_pressed():
 	var chosen_deck_id = chosen_deck['id']
 	if player_selected_character.begins_with("random"):
 		chosen_deck_id = player_selected_character + "#" + chosen_deck_id
-	NetworkManager.join_room(player_name, 
-		room_name, 
-		chosen_deck_id, 
-		GlobalSettings.CustomStartingTimer, 
+	NetworkManager.join_room(player_name,
+		room_name,
+		chosen_deck_id,
+		GlobalSettings.CustomStartingTimer,
 		GlobalSettings.CustomEnforceTimer,
 		GlobalSettings.CustomMinimumTimePerChoice)
 	update_buttons(true)
@@ -281,9 +309,7 @@ func update_buttons(joining : bool):
 	start_ai_button.disabled = joining
 	change_player_character_button.disabled = joining
 	room_select.editable = not joining
-	join_box.visible = not joining
-	matchmake_button.visible = not joining
-	$MenuList/CancelButton.visible = joining
+	cancel_button.visible = joining
 	player_list_button.disabled = joining
 	match_list_button.disabled = joining
 
@@ -298,24 +324,9 @@ func _on_update_name_button_pressed():
 	GlobalSettings.set_player_name(player_name)
 
 func _on_reconnect_to_server_button_pressed():
-	$ServerStatusLabel.text = "Reconnecting to server..."
+	server_status_label.text = "Reconnecting to server..."
 	NetworkManager.connect_to_server()
-	$ReconnectToServerButton.disabled = true
-
-func _on_matchmake_button_pressed():
-	just_clicked_matchmake = true
-	var player_name = get_player_name()
-	var chosen_deck = CardDefinitions.get_deck_from_str_id(player_selected_character)
-	var chosen_deck_id = chosen_deck['id']
-	if player_selected_character.begins_with("random"):
-		chosen_deck_id = player_selected_character + "#" + chosen_deck_id
-	if chosen_deck_id in GlobalSettings.CharacterBanlist:
-		if not $SpecialSelectAudio.playing:
-			$SpecialSelectAudio.play()
-		_on_join_failed("\"Weaklings should stay away...\"\n(This character is banned\nfrom public matchmaking.)")
-	else:
-		NetworkManager.join_matchmaking(player_name, chosen_deck_id)
-		update_buttons(true)
+	reconnect_button.disabled = true
 
 func _on_char_select_close_character_select():
 	char_select.visible = false
@@ -428,3 +439,21 @@ func _on_view_replay_button_pressed():
 func _on_settings_button_pressed():
 	settings_window.visible = true
 
+func join_matchmaking(match_type : String):
+	just_clicked_matchmake = true
+	var player_name = get_player_name()
+	var chosen_deck = CardDefinitions.get_deck_from_str_id(player_selected_character)
+	var chosen_deck_id = chosen_deck['id']
+	if player_selected_character.begins_with("random"):
+		chosen_deck_id = player_selected_character + "#" + chosen_deck_id
+	NetworkManager.join_matchmaking(player_name, chosen_deck_id, match_type)
+	update_buttons(true)
+
+func _on_matchmake_timed_button_pressed():
+	join_matchmaking("timed")
+
+func _on_matchmake_speed_button_pressed():
+	join_matchmaking("speed")
+
+func _on_matchmake_untimed_button_pressed():
+	join_matchmaking("untimed")

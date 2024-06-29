@@ -18,7 +18,10 @@ enum NetworkState {
 var network_state = NetworkState.NetworkState_NotConnected
 var cached_players = []
 var cached_matches = []
-var cached_match_available : bool = false
+var cached_match_types_available = {
+	"timed" : false,
+	"untimed" : false,
+	"speed" : false}
 
 const azure_url = "wss://fightingcardslinux.azurewebsites.net"
 const local_url = "ws://localhost:8080"
@@ -160,7 +163,7 @@ func get_stripped_room_name(room_name : String):
 func _handle_players_update(message):
 	var players = message["players"]
 	var rooms = message["rooms"]
-	var match_available = message['match_available']
+	var match_types_available = message['match_types_available']
 	var player_list = []
 	for player in players:
 		var id = player["player_id"]
@@ -177,7 +180,7 @@ func _handle_players_update(message):
 			"room_name": room_name,
 		})
 	cached_players = player_list
-	cached_match_available = match_available
+	cached_match_types_available = match_types_available
 
 	# Process rooms
 	var match_list = []
@@ -218,7 +221,7 @@ func _handle_players_update(message):
 
 ### Commands ###
 
-func join_room(player_name, room_name, deck_id_str : String, 
+func join_room(player_name, room_name, deck_id_str : String,
 		starting_timer : int, enforce_timer : bool, minimum_time_per_choice : int):
 	if not _socket: return
 	var join_room_message = {
@@ -245,7 +248,7 @@ func observe_room(player_name, room_name):
 	var json = JSON.stringify(observe_room_message)
 	_socket.send_text(json)
 
-func join_matchmaking(player_name, deck_id_str : String):
+func join_matchmaking(player_name, deck_id_str : String, match_type : String):
 	if not _socket: return
 	var message = {
 		"version": GlobalSettings.get_client_version(),
@@ -254,7 +257,8 @@ func join_matchmaking(player_name, deck_id_str : String):
 		"deck_id": deck_id_str,
 		"starting_timer": GlobalSettings.MatchmakingStartingTimer,
 		"enforce_timer": GlobalSettings.MatchmakingEnforceTimer,
-		"minimum_time_per_turn": GlobalSettings.MatchmakingMinimumTimePerChoice
+		"minimum_time_per_turn": GlobalSettings.MatchmakingMinimumTimePerChoice,
+		"match_type" : match_type
 	}
 	var json = JSON.stringify(message)
 	_socket.send_text(json)
